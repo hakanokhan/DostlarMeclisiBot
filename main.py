@@ -131,7 +131,7 @@ def start_bot_polling():
 # --- TELETHON ---
 async def start_telethon():
     print("🚀 Telethon aktif!")
-    await user.start()  # session olduğu için numara istemez
+    await user.start(bot_token=BOT_TOKEN)  # 🔥 KRİTİK DÜZELTME
     await user.run_until_disconnected()
 
 # --- ANA BAŞLATMA ---
