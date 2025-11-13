@@ -6,7 +6,9 @@ from flask import Flask
 # --- AYARLAR ---
 api_id = 18872089
 api_hash = 'e410fe46dd11d639a36f3d2fa03ea901'
-BOT_TOKEN = "8249259150:AAHVvFZPXx6YSxh5SntYmPzU_CaLyzMzIEg"
+
+# YENİ TOKEN BURADA!
+BOT_TOKEN = "8249259150:AAH0D0QqbonqwsLcmVyL05ExLOFiqC6D4N4"
 
 TARGET_GROUP = -1003027355359
 ADMIN_ID = 1556304675
@@ -19,6 +21,7 @@ DELETE_DELAY = 60
 SEND_DELAY = 0.5
 DUPLICATE_DELAY = 30
 
+# Render için session dosyası kullan, numara istemesin
 user = TelegramClient('session', api_id, api_hash)
 bot = TeleBot(BOT_TOKEN)
 app = Flask(__name__)
@@ -48,6 +51,7 @@ def extract_site_name(link):
     match = re.search(r'https?://(?:www\.)?([a-zA-Z0-9\-]+)', link)
     return match.group(1).upper() if match else "SITE"
 
+# --- GELİŞMİŞ DİNLEYİCİ ---
 @user.on(events.NewMessage)
 async def listener(event):
     text = (event.raw_text or "").strip()
@@ -58,7 +62,9 @@ async def listener(event):
     if len(lines) < 3:
         return
 
-    site_line, code_line, link = None, None, None
+    site_line = None
+    code_line = None
+    link = None
 
     for l in lines:
         if not site_line and re.match(r'^[A-Za-z0-9\-]{3,}$', l):
@@ -68,7 +74,7 @@ async def listener(event):
         elif not link and "http" in l:
             link = l
 
-    if not (site_line and code_line and link):
+    if not site_line or not code_line or not link:
         return
 
     blocked_words = [
@@ -88,18 +94,22 @@ async def listener(event):
     try:
         await asyncio.sleep(SEND_DELAY)
         sent_msg = bot.send_message(TARGET_GROUP, msg_html, parse_mode="HTML")
-        print(f"✅ Gönderildi: {site_line} | {code_line}")
+        print(f"✅ Gönderildi: {site_line} - {code_line}")
+
         await asyncio.sleep(DELETE_DELAY)
         bot.delete_message(TARGET_GROUP, sent_msg.message_id)
         print(f"🗑️ Silindi: {site_line}")
+
     except Exception as e:
         print("⚠️ Gönderim hatası:", e)
 
+# --- DUYURU / ACİL ---
 @bot.message_handler(commands=['duyuru', 'acil'])
 def handle_announcement(message):
     if message.from_user.id != ADMIN_ID:
         return bot.reply_to(message, "❌ Yetkin yok moruq.")
-    cmd = message.text.split(' ', 1)
+
+    cmd = message.text.split(" ", 1)
     if len(cmd) < 2:
         return bot.reply_to(message, "⚠️ Mesajı yazmayı unuttun moruq.")
 
@@ -107,26 +117,24 @@ def handle_announcement(message):
     bot.send_message(message.chat.id, f"{header}\n\n{cmd[1]}", parse_mode="HTML")
     bot.reply_to(message, "✅ Duyuru gönderildi moruq.")
 
-polling_started = threading.Event()
-
+# --- TELEBOT POLLING TEK INSTANCE ---
 def start_bot_polling():
-    if polling_started.is_set():
-        return
-    polling_started.set()
     print("🤖 TeleBot polling başlıyor...")
     while True:
         try:
             bot.remove_webhook()
-            bot.infinity_polling(skip_pending=True, timeout=60)
+            bot.infinity_polling(skip_pending=True, allowed_updates=["message"])
         except Exception as e:
-            print("⚠️ Polling koptu, 5sn sonra yeniden:", e)
+            print("⚠️ Polling koptu, 5 sn sonra tekrar:", e)
             time.sleep(5)
 
+# --- TELETHON ---
 async def start_telethon():
-    await user.start()
     print("🚀 Telethon aktif!")
+    await user.start()  # session olduğu için numara istemez
     await user.run_until_disconnected()
 
+# --- ANA BAŞLATMA ---
 if __name__ == "__main__":
     threading.Thread(target=start_bot_polling, daemon=True).start()
     threading.Thread(target=lambda: app.run(host="0.0.0.0", port=8080), daemon=True).start()
