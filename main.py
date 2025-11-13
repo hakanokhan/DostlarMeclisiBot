@@ -1,3 +1,4 @@
+# main.py — Dostlar Meclisi | Render için Düzeltilmiş Sürüm 🔥
 from telethon import TelegramClient, events
 from telebot import TeleBot
 import asyncio, re, time, threading
@@ -19,7 +20,7 @@ DELETE_DELAY = 60
 SEND_DELAY = 0.5
 DUPLICATE_DELAY = 30
 
-# Render için: GİRİŞ İSTEMESİN diye session oluşturuyoruz
+# Render için NUMARA SORMAYAN session
 user = TelegramClient('session', api_id, api_hash)
 bot = TeleBot(BOT_TOKEN)
 app = Flask(__name__)
@@ -31,14 +32,12 @@ recent_sites = {}
 def home():
     return "🔥 Dostlar Meclisi Bot Aktif (Render) 🔥"
 
-
 def already_sent(code):
     now = time.time()
     if code in sent_codes and (now - sent_codes[code]) < CODE_TTL:
         return True
     sent_codes[code] = now
     return False
-
 
 def site_spam(site):
     now = time.time()
@@ -47,11 +46,9 @@ def site_spam(site):
     recent_sites[site] = now
     return False
 
-
 def extract_site_name(link):
     match = re.search(r'https?://(?:www\.)?([a-zA-Z0-9\-]+)', link)
     return match.group(1).upper() if match else "SITE"
-
 
 # --- GELİŞMİŞ DİNLEYİCİ ---
 @user.on(events.NewMessage)
@@ -60,14 +57,11 @@ async def listener(event):
     if not text:
         return
 
-    # Mesaj parçalama
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     if len(lines) < 3:
         return
 
-    site_line = None
-    code_line = None
-    link = None
+    site_line, code_line, link = None, None, None
 
     for l in lines:
         if not site_line and re.match(r'^[A-Za-z0-9\-]{3,}$', l):
@@ -80,18 +74,16 @@ async def listener(event):
     if not (site_line and code_line and link):
         return
 
-    # Engellenen kelimeler
     blocked_words = [
         'etkinlik','kampanya','turnuva','yatırım','hediye','bonus',
         'duyuru','reklam','çekiliş','sohbet','katıl','güvenilir',
         'test','deneme','youtube','canlı','yayındayız','stream'
     ]
+
     if any(w in text.lower() for w in blocked_words):
         return
-
     if any(s in text.lower() for s in blocked_sites):
         return
-
     if already_sent(code_line) or site_spam(site_line):
         return
 
@@ -100,47 +92,43 @@ async def listener(event):
     try:
         await asyncio.sleep(SEND_DELAY)
         sent_msg = bot.send_message(TARGET_GROUP, msg_html, parse_mode="HTML")
-        print(f"✅ Gönderildi: {site_line} - {code_line}")
+        print(f"✅ İlk gelen gönderildi: {site_line} - {code_line}")
+
         await asyncio.sleep(DELETE_DELAY)
         bot.delete_message(TARGET_GROUP, sent_msg.message_id)
         print(f"🗑️ Silindi: {site_line}")
+
     except Exception as e:
         print("⚠️ Gönderim hatası:", e)
 
-
-# --- DUYURU / ACİL ---
-@bot.message_handler(commands=['duyuru', 'acil'])
+# --- DUYURU ---
+@bot.message_handler(commands=['duyuru','acil'])
 def handle_announcement(message):
     if message.from_user.id != ADMIN_ID:
         return bot.reply_to(message, "❌ Yetkin yok moruq.")
-
     cmd = message.text.split(' ', 1)
     if len(cmd) < 2:
         return bot.reply_to(message, "⚠️ Mesajı yazmayı unuttun moruq.")
-
     header = "🔴 <b>ACİL DUYURU</b>" if message.text.startswith("/acil") else "📢 <b>DOSTLAR MECLİSİ DUYURUSU</b>"
     bot.send_message(message.chat.id, f"{header}\n\n{cmd[1]}", parse_mode="HTML")
     bot.reply_to(message, "✅ Duyuru gönderildi moruq.")
 
-
-# --- TELEBOT POLLING TEK INSTANCE ---
+# --- TELEBOT POLLING ---
 def start_bot_polling():
     print("🤖 TeleBot polling başlıyor...")
     while True:
         try:
             bot.remove_webhook()
-            bot.infinity_polling(skip_pending=True)
+            bot.infinity_polling(skip_pending=True, allowed_updates=["message"], timeout=60)
         except Exception as e:
-            print("⚠️ Polling koptu:", e)
+            print("⚠️ Polling koptu, 5 sn sonra tekrar:", e)
             time.sleep(5)
 
-
-# --- TELETHON START ---
+# --- TELETHON START (NUMARA YOK!) ---
 async def start_telethon():
-    await user.start()  # ✔ Artık numara istemez
+    await user.start()  # Artık input yok
     print("🚀 Telethon aktif!")
     await user.run_until_disconnected()
-
 
 # --- ANA BAŞLATMA ---
 if __name__ == "__main__":
