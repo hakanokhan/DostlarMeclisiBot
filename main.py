@@ -1,4 +1,4 @@
-# main.py — Dostlar Meclisi | Render için Düzeltilmiş Sürüm 🔥
+# main.py — Dostlar Meclisi | Stabil + Numara İstemeyen Sürüm 🔥
 from telethon import TelegramClient, events
 from telebot import TeleBot
 import asyncio, re, time, threading
@@ -20,7 +20,7 @@ DELETE_DELAY = 60
 SEND_DELAY = 0.5
 DUPLICATE_DELAY = 30
 
-# Render için NUMARA SORMAYAN session
+# Render için login gerektirmeyen Telethon:
 user = TelegramClient('session', api_id, api_hash)
 bot = TeleBot(BOT_TOKEN)
 app = Flask(__name__)
@@ -50,6 +50,7 @@ def extract_site_name(link):
     match = re.search(r'https?://(?:www\.)?([a-zA-Z0-9\-]+)', link)
     return match.group(1).upper() if match else "SITE"
 
+
 # --- GELİŞMİŞ DİNLEYİCİ ---
 @user.on(events.NewMessage)
 async def listener(event):
@@ -61,7 +62,9 @@ async def listener(event):
     if len(lines) < 3:
         return
 
-    site_line, code_line, link = None, None, None
+    site_line = None
+    code_line = None
+    link = None
 
     for l in lines:
         if not site_line and re.match(r'^[A-Za-z0-9\-]{3,}$', l):
@@ -92,16 +95,15 @@ async def listener(event):
     try:
         await asyncio.sleep(SEND_DELAY)
         sent_msg = bot.send_message(TARGET_GROUP, msg_html, parse_mode="HTML")
-        print(f"✅ İlk gelen gönderildi: {site_line} - {code_line}")
-
+        print(f"✅ Gönderildi: {site_line} - {code_line}")
         await asyncio.sleep(DELETE_DELAY)
         bot.delete_message(TARGET_GROUP, sent_msg.message_id)
         print(f"🗑️ Silindi: {site_line}")
-
     except Exception as e:
         print("⚠️ Gönderim hatası:", e)
 
-# --- DUYURU ---
+
+# --- DUYURU / ACİL ---
 @bot.message_handler(commands=['duyuru','acil'])
 def handle_announcement(message):
     if message.from_user.id != ADMIN_ID:
@@ -113,22 +115,29 @@ def handle_announcement(message):
     bot.send_message(message.chat.id, f"{header}\n\n{cmd[1]}", parse_mode="HTML")
     bot.reply_to(message, "✅ Duyuru gönderildi moruq.")
 
-# --- TELEBOT POLLING ---
+
+# --- TELEBOT POLLING (tek instance) ---
 def start_bot_polling():
     print("🤖 TeleBot polling başlıyor...")
     while True:
         try:
             bot.remove_webhook()
-            bot.infinity_polling(skip_pending=True, allowed_updates=["message"], timeout=60)
+            bot.infinity_polling(skip_pending=True, timeout=60)
         except Exception as e:
-            print("⚠️ Polling koptu, 5 sn sonra tekrar:", e)
+            print("⚠️ Polling hatası:", e)
             time.sleep(5)
 
-# --- TELETHON START (NUMARA YOK!) ---
+
+# --- TELETHON (NUMARA SORMAYAN) ---
 async def start_telethon():
-    await user.start()  # Artık input yok
-    print("🚀 Telethon aktif!")
+    try:
+        await user.start(bot_token=BOT_TOKEN)   # 🔥 TELETHON artık numara istemez!
+        print("🚀 Telethon aktif!")
+    except Exception as e:
+        print("❌ Telethon başlatma hatası:", e)
+
     await user.run_until_disconnected()
+
 
 # --- ANA BAŞLATMA ---
 if __name__ == "__main__":
